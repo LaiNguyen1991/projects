@@ -1,0 +1,443 @@
+{
+  "name": "Xray AI Test Cases Generator with Context",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "your-webhook-id",
+        "formTitle": "Xray AI Test Generator",
+        "formDescription": "Generate Xray Test Cases from Jira Ticket using Test Repository Context",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Project",
+              "placeholder": "Please enter the your Project name",
+              "defaultValue": "PROJECT",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Jira Story Issue",
+              "placeholder": "e.g. PROJECT-123",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Xray Folder Path",
+              "placeholder": "e.g. Folder/Sub Folder"
+            },
+            {
+              "fieldLabel": "Label(s)",
+              "placeholder": "e.g. Label1, Label2"
+            },
+            {
+              "fieldLabel": "UI image(s)",
+              "fieldType": "file"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "77d08099-68bb-40e9-9010-5fd02f98788b",
+      "name": "Input Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        3232
+      ],
+      "webhookId": "your-webhook-id",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "issueKey": "={{ $('Input Form').item.json[\"Jira Story Issue\"] }}",
+        "additionalFields": {}
+      },
+      "id": "7134d44b-5fd5-47a9-a8e2-48d90dcbe388",
+      "name": "Retrieve Jira Story Issue",
+      "type": "n8n-nodes-base.jira",
+      "typeVersion": 1,
+      "position": [
+        528,
+        3232
+      ],
+      "credentials": {
+        "jiraSoftwareCloudApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Jira Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "project",
+              "value": "={{ $('Input Form').item.json.Project }}",
+              "type": "string",
+              "id": "e732b430-231d-4e8f-9272-63ec8e388fe8"
+            },
+            {
+              "id": "1aa1facd-c9c3-4b6d-a48a-3405f924c73f",
+              "name": "project_id",
+              "value": "={{ $json.fields.project.id }}",
+              "type": "string"
+            },
+            {
+              "name": "xray_path",
+              "value": "={{ $('Input Form').item.json['Xray Folder Path'] }}",
+              "type": "string",
+              "id": "0537b4d4-12f1-4638-8ea6-c16b775c9061"
+            },
+            {
+              "id": "9a326290-8acb-4b10-b98d-3ae69600ce4d",
+              "name": "label(s)",
+              "value": "={{ $('Input Form').item.json[\"Label(s)\"] }}",
+              "type": "string"
+            },
+            {
+              "name": "jira_ticket",
+              "value": "={{ $json.key }}",
+              "type": "string",
+              "id": "2926538c-7a27-4184-a557-76f6421a7f64"
+            },
+            {
+              "name": "jira_ticket_id",
+              "value": "={{ $json.id }}",
+              "type": "string",
+              "id": "cafaa628-a550-42bc-ab9e-8db4513f3b65"
+            },
+            {
+              "name": "summary",
+              "value": "={{ $json.fields.summary }}",
+              "type": "string",
+              "id": "1c20bb7c-c73f-41ce-a3dc-262fdfd87ac4"
+            },
+            {
+              "name": "description",
+              "value": "={{ $json.fields.description }}",
+              "type": "string",
+              "id": "be7272a9-3b6b-484c-bb85-d3b56f71932c"
+            },
+            {
+              "name": "acceptance_criteria",
+              "value": "={{ $json.fields.customfield_10095 }}",
+              "type": "string",
+              "id": "637dbda6-8f2d-4328-8852-de4b26c0953c"
+            },
+            {
+              "name": "technical_solution",
+              "value": "={{ $json.fields.customfield_10199 }}",
+              "type": "string",
+              "id": "17c05cb8-153b-4ebb-af7b-3fc37fe3b981"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2b92308e-9c0e-4d9a-bde8-22abc4f671fe",
+      "name": "Clean Jira Story Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        752,
+        3232
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Convert a numeric index to lowercase alphabet\n */\nfunction getAlphaIndex(num) {\n  return String.fromCharCode(96 + num);\n}\n\n/**\n * Convert a numeric index to lowercase Roman numeral\n */\nfunction getRomanIndex(num) {\n  const romanMap = [\"\", \"i\", \"ii\", \"iii\", \"iv\", \"v\", \"vi\", \"vii\", \"viii\", \"ix\", \"x\"];\n  return romanMap[num] || num.toString();\n}\n\n/**\n * Transform Jira Wiki-style headings into structured numbering\n */\nfunction formatJiraWiki(text) {\n  if (!text || typeof text !== 'string') return text || \"\";\n\n  const lines = text.replace(/\\\\n/g, '\\n').split('\\n');\n\n  let level1Counter = 0;\n  let level2Counter = 0;\n  let level3Counter = 0;\n\n  const formattedLines = lines.map(line => {\n    const trimmedLine = line.trim();\n\n    if (trimmedLine.startsWith('####')) {\n      return line.replace('####', '*');\n    }\n\n    if (trimmedLine.startsWith('###')) {\n      level3Counter++;\n      return line.replace('###', `${getRomanIndex(level3Counter)}.`);\n    }\n\n    if (trimmedLine.startsWith('##')) {\n      level2Counter++;\n      level3Counter = 0;\n      return line.replace('##', `${getAlphaIndex(level2Counter)}.`);\n    }\n\n    if (trimmedLine.startsWith('#')) {\n      level1Counter++;\n      level2Counter = 0;\n      level3Counter = 0;\n      return line.replace('#', `${level1Counter}.`);\n    }\n\n    return line;\n  });\n\n  return formattedLines.join('\\n');\n}\n\nfunction applyFullFormatting(text) {\n  return formatJiraWiki(text);\n}\n\n// Process all input items\nconst items = $input.all();\nconst output = [];\n\nfor (const item of items) {\n  const raw = item.json;\n  const f = raw.fields || {};\n\n  // Core Jira fields\n  const summary = raw.summary || f.summary || \"\";\n  const status =\n    raw.status ||\n    (typeof f.status === 'object' ? f.status.name : f.status) ||\n    \"\";\n  const issuetype =\n    raw.issuetype ||\n    (typeof f.issuetype === 'object' ? f.issuetype.name : f.issuetype) ||\n    \"\";\n  const parentKey = raw.parentKey || f.parent?.key || \"\";\n\n  // Custom fields\n  const acRaw = raw.acceptance_criteria || f.customfield_10095 || \"\";\n  const techRaw = raw.technical_solution || f.customfield_10199 || \"\";\n  const descRaw = raw.description || f.description || f.customfield_10752 || \"\";\n\n  // NEW: top-level metadata fields (your request)\n  const project = raw.project || \"\";\n  const project_id = raw.project_id || \"\";\n  const xray_path = raw.xray_path || \"\";\n  const labels = (raw[\"label(s)\"] || \"\")\n  .split(\",\")\n  .map(l => l.trim())\n  .filter(Boolean);\n  const jira_ticket = raw.jira_ticket || \"\";\n  const jira_ticket_id = raw.jira_ticket_id || \"\";\n\n  output.push({\n    json: {\n      key: raw.key,\n      id: raw.id,\n\n      // NEW OUTPUT FIELDS\n      project,\n      project_id,\n      xray_path,\n      labels,\n      jira_ticket,\n      jira_ticket_id,\n      summary: applyFullFormatting(summary),\n      description: applyFullFormatting(descRaw),\n      acceptance_criteria: applyFullFormatting(acRaw),\n      technical_solution: applyFullFormatting(techRaw)\n    }\n  });\n}\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        3136
+      ],
+      "id": "e5a55474-cfc6-464c-a60f-5f0685a7418b",
+      "name": "Normalize Jira Story Format"
+    },
+    {
+      "parameters": {
+        "jsCode": "const config = $('Configure').first().json;\n\nconst token = $('Get Xray Token').first().json.token;\n\nconst GRAPHQL_URL = config.xray.graphqlUrl;\n\n// Input\nconst projectId = $json.project_id;\nconst folderPath = ($json.xray_path || \"\").trim();\n\n// \u2705 EARLY RETURN: skip everything if empty\nif (!folderPath) {\n  return [\n    {\n      json: {\n        count: null,\n        existingTests: null,\n        folderPath: null,\n        projectId,\n        skipped: true,\n        reason: \"xray_path is empty -> no API call executed\",\n      },\n    },\n  ];\n}\n\n// Pagination\nlet start = 0;\nconst limit = 100;\nlet total = 0;\nconst allTests = [];\n\n// GraphQL query loop\ndo {\n  const query = `\nquery {\n  getTests(\n    projectId: \"${projectId}\",\n    folder: {\n      path: \"${folderPath}\",\n      includeDescendants: true\n    },\n    limit: ${limit},\n    start: ${start}\n  ) {\n    total\n    results {\n      jira(fields: [\"id\", \"key\", \"summary\", \"labels\"])\n      steps {\n        action\n        data\n        result\n        callTestIssueId\n      }\n    }\n  }\n}`;\n\n  const res = await this.helpers.httpRequest({\n    method: \"POST\",\n    url: GRAPHQL_URL,\n    headers: {\n      Authorization: `Bearer ${token}`,\n      \"Content-Type\": \"application/json\",\n    },\n    body: {\n      query,\n    },\n    json: true,\n  });\n\n  const data = res?.data?.getTests;\n  total = data?.total || 0;\n\n  const results = data?.results || [];\n  allTests.push(...results);\n\n  start += limit;\n\n} while (start < total);\n\n// RETURN\nreturn [\n  {\n    json: {\n      projectId,\n      folderPath,\n      count: allTests.length,\n      existingTests: allTests,\n      skipped: false,\n    },\n  },\n];"
+      },
+      "id": "bd12f672-1f30-4360-aaa4-010a98080bb7",
+      "name": "Get Xray Tests",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        3328
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "a7f8900a-e55e-4e39-a0f5-6c36eb5fb42c",
+      "name": "Merge Context",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1200,
+        3232
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\n// 1. Create a lookup map: Jira ID -> original array of steps\nconst testMap = {};\n(data.existingTests || []).forEach(t => {\n  if (t.jira && t.jira.id) {\n    testMap[t.jira.id] = t.steps || [];\n  }\n});\n\n// 2. Recursive function to resolve and flatten steps from callTestIssueId\nfunction resolveSteps(steps, lookupMap, visited = new Set()) {\n  let resolved = [];\n  \n  for (const step of steps) {\n    if (step.callTestIssueId && lookupMap[step.callTestIssueId]) {\n      const targetId = step.callTestIssueId;\n      \n      // Guard clause to prevent infinite loops if test cases reference each other circular-wise\n      if (visited.has(targetId)) {\n        continue; \n      }\n      \n      visited.add(targetId);\n      // Recursively resolve nested referenced steps\n      const subSteps = resolveSteps(lookupMap[targetId], lookupMap, new Set(visited));\n      resolved = resolved.concat(subSteps);\n      visited.delete(targetId);\n    } else {\n      // If it is a standard step, retain only the core content and exclude callTestIssueId\n      resolved.push({\n        action: step.action,\n        data: step.data,\n        result: step.result\n      });\n    }\n  }\n  \n  return resolved;\n}\n\n// 3. Process data compression with flattened step resolution\nconst compressed = (data.existingTests || []).map(t => {\n  const jiraData = t.jira || {};\n  \n  // Resolve all referenced steps for the current test case\n  const fullSteps = resolveSteps(t.steps || [], testMap);\n  \n  return {\n    id: jiraData.id,\n    key: jiraData.key,\n    summary: jiraData.summary,\n    labels: jiraData.labels || [],\n    sample_steps: fullSteps.slice(0, 15) // Slice the output to 15 steps to save tokens\n  };\n});\n\nconst result = {\n  json: {\n    ...data,\n    existingTestsCompressed: compressed\n  }\n};\n\n// Retain the original binary data from 'Input Form' node if available\ntry {\n  const formNode = $('Input Form');\n  if (formNode && formNode.item && formNode.item.binary) {\n    result.binary = formNode.item.binary;\n  }\n} catch (e) {\n  // Gracefully skip if 'Input Form' or binary object does not exist\n}\n\nreturn [result];"
+      },
+      "id": "389a9e29-d313-48f0-bdd7-f85dbc575edb",
+      "name": "Compress Existing Tests",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1424,
+        3232
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a Senior QA Engineer responsible for generating high-quality, reusable, and non-duplicated test cases in a software system.\n\n\ud83d\udea8 GLOBAL RULES (MANDATORY & ABSOLUTE ENFORCEMENT)\n- EVERY SINGLE RULE defined throughout this entire prompt MUST be strictly applied and executed in ALL test case generation scenarios under any circumstances.\n\u274c ABSOLUTELY NO COMPROMISE, NO OMISSION, and NO OVERLOOKING of any sub-rules allowed. If any rule is violated, the output is considered completely invalid.\n\n==================================================\n1. REPOSITORY USAGE & STYLE STRATEGY\n==================================================\n\nIF REPOSITORY IS RICH / CONTAINS EXISTING TESTS:\n- Treat repository as Single Source of Truth.\n- Prioritize reuse of existing end-to-end flows over creating new tests.\n- Avoid duplicate or overlapping coverage by reusing existing test flows where applicable.\n- Follow repository style EXACTLY for:\n  * Naming convention & Reusable flow structure (Look at existing tests to get the exact Module name string).\n  * Step wording & Validation/Expected result wording.\n  \u26a0\ufe0f NOTE ON MARKDOWN STYLE FROM REPOSITORY: Look at the existing repository data. It uses strictly single asterisks for UI fields (e.g., *Customer Tax ID*, *Tax Payer Information*). You MUST use single asterisks `*Field/Button*` across all new steps. \n  \u274c NEVER flatten repository formatting.\n\nIF REPOSITORY IS EMPTY:\n- Establish a clean modular structure.\n- Keep formatting, spacing, and line breaks strictly consistent across all newly generated tests.\n- Create reusable end-to-end workflows.\n\n\n==================================================\n2. THINKING PROCESS (MANDATORY)\n==================================================\n\nBefore generating test cases, ALWAYS:\n\na. Analyze AC\n- Identify business rules, validations and constraints\n- Identify UI, system, and integration behaviors\n\nb. Cross-reference repository\n- Scan Existing Test Repository.\n- Resolve `callTestIssueId` recursively to build the full expanded flow of each test.\n- Map each AC against expanded repository coverage.\n- Prefer the highest-level reusable flow that covers the required user journey.\n- Avoid recreating steps already covered through direct or indirect reusable flow chains.\n- Identify reusable end-to-end flows and prevent duplicate coverage.\n\nc. Build optimized coverage\n- Ensure all AC are fully covered\n- Maximize validation density per test case\n\n\n==================================================\n3. INPUT DATA\n==================================================\n\n\ud83d\udc49 Current Issue:\n- Key: {{ $json.jira_ticket }}\n- ID: {{ $json.jira_ticket_id }}\n- Issue Summary (INPUT ONLY): {{ $json.summary }}\n- Description: {{ $json.description }}\n- Acceptance Criteria (AC):\n{{ $json.acceptance_criteria }}\n- Technical Solution:\n{{ $json.technical_solution }}\n\n\ud83d\udc49 Existing Test Repository:\n{{ JSON.stringify($json.existingTestsCompressed, null, 2) }}\n\n\ud83d\udc49 UI Images Context:\nUse only if UI images are provided in Input Form node. Otherwise ignore completely.\n[Review attached image files and cross-reference them with AC for UI validation]\n- \u26a0\ufe0f UI VISUALS: Always BOLD and apply Jira colors ({color:hex}...{color}) to the exact message content or format values in step fields:\n  * GREEN ({color:#00875a}): Success toast/alert text.\n  * RED ({color:#de350b}): Failure or system rejection text.\n  * ORANGE ({color:#ffab00}): Attention needed or dynamic processing text.\n  * BLUE ({color:#0052cc}): Specific dynamic formats, IDs, or codes (e.g., {color:#0052cc}[YYMM][eTax invoice no.]...{color}).\n- \u26a0\ufe0f HYPERLINKS: Convert any page URLs or links into Jira markdown: `[Link Text|URL]`.\n\n\n==================================================\n4. OBJECTIVE\n==================================================\n\nGenerate full coverage for:\n- Acceptance Criteria\n- End-to-end business flows (happy and alternative flows)\n- UI & system behavior\n- Edge cases (error, boundary, empty, null)\n- Data state, persistence, access control, integration\n\n\n==================================================\n5. TEST DESIGN RULES\n==================================================\n\n- Each test case MUST represent a complete end-to-end user journey. A complete journey may be represented through reusable call chains referenced by callTestIssueId or callTestName.\n- Optimize the number of test cases by combining related validation steps into a single flow. Do not split a flow unless behaviors or personas are fundamentally different.\n- Maximize assertions/verifications per test case to keep the suite concise without omitting critical edge cases.\n- If a reusable flow (callTestIssueId/callTestName) is partial, the test MUST append only missing steps to complete the full end-to-end journey.\n\n==================================================\n6. TITLE & PREFIX & MODULE EXTRACTION RULES (STRICT CONSISTENCY)\n==================================================\n\nAll components of the test case title MUST be extracted and formatted based on the following strict breakdown:\n\n1. GLOBAL TITLE STRUCTURE & APPLICABILITY:\n[PREFIX] Page/Module - Test objective\n\nRules:\n- \u26a0\ufe0f UNIVERSAL APPLICATION: This title structure and its extraction rules MUST be applied uniformly and consistently across ALL generated test case types (including New, Callable, Duplicate, Positive, Negative, etc.). There are NO exceptions for any test category.\n- Test objective MUST always be present.\n- \u26a0\ufe0f VERB-FIRST OBJECTIVE: The \"Test objective\" component MUST strictly start with an action verb (e.g., Verify, Display, Validate, Check, Prevent, Allow, Execute, Trigger, etc.).\n- If PREFIX exists, it MUST be included.\n- If Page/Module exists, it MUST be included.\n- Only omit a component when it cannot be determined from the issue.\n- Do not generate empty brackets, extra spaces, or dangling hyphens.\n\n2. PREFIX EXTRACTION:\n- If Issue summary starts with [xxx], extract the value inside [], trim spaces, convert to UPPERCASE, and ALWAYS preserve square brackets (e.g., [VN], [TW], [TW-SAP]).\n\n3. MODULE EXTRACTION & NOISE REMOVAL (STRICTLY NO VERBS):\n- Extract strictly the core static business module/package/feature name from the Issue summary. \n- REMOVE these noise words from the module component: enhancement, improve, improvement, fix, bug, update, refactor, change, minor, major, create, enable, display, input, check, verify.\n\n\u26a0\ufe0f REPOSITORY CONSISTENCY: Cross-reference with `existingTestsCompressed` to match the EXACT base noun phrase used for that package/module.\n\u26a0\ufe0f OVERRIDE RULE:\nIf repository naming convention conflicts with module extraction rules, repository naming MUST take priority.\n\n==================================================\n7. TEST REUSE STRATEGY (STRICT PRIORITY)\n==================================================\n\nEvaluate and apply test reuse strategy in the following STRICT HIERARCHICAL ORDER:\n\n\ud83d\udea8 OVERRIDE FOR SYSTEM TEST / REGRESSION TEST / SANITY TEST\n- Apply this section ONLY if Issue Summary contains \"System Test\", \"Regression Test\", or \"Sanity Test\" (case-insensitive). Otherwise, ignore this section completely.\n- Treat Existing Test Repository as the source of truth and resolve callTestIssueId recursively.\n- If any existing flow broadly covers the same happy path, end-to-end flow, or business journey:\n\n\u274c Do not generate new steps.\n\u274c Do not create Callable tests.\n\u274c Do not apply Rules 2\u20134.\n\nReturn:\n- \"type\": \"Duplicate\".\n- \"originalTestIssueId\": MUST always be the numeric system ID of that duplicated test case from the repository (e.g., \"1280523\").\n- \"originalTestIssue\": MUST always be the Jira Key of that duplicated test case from the repository (e.g., \"EP-23924\").\n- Keep \"jira_ticket\" and \"jira_ticket_id\"\n- Leave all other fields as empty strings \"\".\n\nDifferent wording in Description or AC MUST NOT create new tests.\n\n\n1\ufe0f\u20e3 DUPLICATE CHECK (HIGHEST PRIORITY)\n\n\ud83d\udea8 ZERO-DELTA RULE: If a scenario contains SOLELY a single \"callTestIssueId\" or \"callTestName\" with NO other action steps, it MUST be classified as \"type\": \"Duplicate\". Creating a wrapper test is forbidden.\n\nCheck if the repository already covers ALL of the following:\n- same business scope\n- same user journey\n- same validations\n- same expected results\n\nIF YES:\nReturn immediately:\n- \"type\": \"Duplicate\"\n- \"originalTestIssueId\": numeric system ID of matched test\n- \"originalTestIssue\": Jira Key of matched test\n- keep jira_ticket and jira_ticket_id\n- all other fields = \"\"\n\nIF NO:\nProceed to Rule 2 (Reuse Existing Test)\n\n2\ufe0f\u20e3 REUSE EXISTING TEST (callTestIssueId)\nIf an existing test in the repository matches the business flow, user journey, or UI behavior:\n- Reuse it by inserting {\"callTestIssueId\": \"Existing_ID\"} into the steps.\n\u274c DO NOT recreate steps that already exist in those reusable flows.\n- Matching Criteria: Must be based strictly on step similarity, expected result similarity, and business workflow similarity.\n\n* Resolve callTestIssueId and callTestName recursively ONLY to build the expanded flow for repository coverage analysis.\n* The generated output MUST remain compact by referencing reusable flows using callTestIssueId or callTestName instead of expanding those reusable steps.\n* If multiple reusable flows have equivalent coverage,\nprefer the most specific flow (closest parent),\nthen prefer the repository flow over newly generated Callable tests.\n* Append ONLY the additional steps not already covered.\n* Prefer the closest parent flow rather than the root flow.\n* Never recreate steps already covered through direct or indirect call chains.\n\n3\ufe0f\u20e3 CALLABLE FLOW (NEW REUSABLE PATTERN)\n- If two or more newly generated test cases contain reusable business flows,\nextract the shared flow into a separate test case with \"type\" = \"Callable\".\n\nA Callable test may contain:\n- a single reusable business action (e.g. Login, Access Payment Detail page),\n- or multiple reusable steps.\n- Do NOT create Callable tests for isolated generic UI interactions\n(e.g. Click Save, Click Search, Enter Customer Name),\nunless the interaction itself represents a reusable business flow.\n- When an equivalent reusable flow already exists in the repository,reuse the repository flow instead of generating a new Callable test.\n- A Callable test MUST NOT duplicate any existing repository flow.\n- All generated test cases that use the shared flow MUST reference it using: {\"callTestName\":\"Exact Summary\"}\n\n4\ufe0f\u20e3 NEW TEST (LAST RESORT)\nOnly create completely new test cases if no reusable flow exists in either the repository or the newly generated set.\n\n\n==================================================\n8. OUTPUT FORMAT & FIELD CONTENT RULES (GOLDEN STANDARD)\n==================================================\n\nReturn exactly one JSON code block and nothing else.\n\u274c DO NOT return any markdown wrappers (except the json block), explanations, conversational text, comments, or extra text. All null values MUST be replaced with an empty string \"\".\n\n\ud83d\udea8 CRITICAL DATA CONTENT RULES WITHIN JSON:\n- \u26a0\ufe0f MANDATORY FOR ALL TEST TYPES: You MUST fully populate `jira_ticket` and `jira_ticket_id` with \"{{ $json.jira_ticket }}\" and \"{{ $json.jira_ticket_id }}\" for EVERY single test case object in the array. \u274c NEVER leave them as empty strings `\"\"` regardless of the test case type.\n \u26a0\ufe0f NO PRECONDITION: Leave the 'precondition' field as an empty string `\"\"` at all times. All user paths and context setup must happen sequentially within the steps of the test scenario.\n \u26a0\ufe0f 'summary' FIELD RULE: The 'summary' field MUST be exactly identical to the generated TITLE (1:1 mapping). 'summary' is NOT independently generated and MUST NOT be derived from input fields or modified in any way.\n\n- For Regular Steps ('action' & 'result' paired together): \n  * Each step object represents a single test step containing 1 core action AND its corresponding expected result.\n  * 'action' MUST NOT end with a period (.).\n  * 'result' MUST be observable and verifiable. NEVER use vague wording. Specify exact UI titles, default values, and element property states. MUST end with a period (.).\n- For Call Steps (\"callTestIssueId\" or \"callTestName\"): MUST be placed in its own separate step object containing ONLY \"callTestIssueId\" OR \"callTestName\".\n\n- For multiline fields (\"data\" or \"result\" containing multiple values):\n  * If the 'result' field contains multiple expected outcomes, each line MUST start with `* `. If it contains only one expected outcome, use plain text without `* `.\n  * Separate multiple lines using literal JSON newline characters `\\n` (e.g., `* First point\\n* Second point`) to ensure proper Xray rendering.\n\n\n--------------------------------------------------\nCORRECT FORMAT EXAMPLE: \n\n{\n  \"test_cases\": [\n    {\n      \"jira_ticket\": \"{{ $json.jira_ticket }}\",\n      \"jira_ticket_id\": \"{{ $json.jira_ticket_id }}\",\n      \"summary\": \"exact_Title\",\n       \"type\": \"Positive | Negative | Edge case | Callable | Duplicate\",\n      \"originalTestIssueId\": \"\",\n      \"originalTestIssue\": \"\",\n      \"precondition\": \"\",\n      \"test_scenario\": [\n        {\n          \"action\": \"Access to the Tax Invoice Management page\",\n          \"data\": \"\",\n          \"result\": \"The *eTax Invoice* workspace layout parameters load completely\"\n        },\n        {\n          \"action\": \"Click on the Inquire BL button within the product row action frame\",\n          \"data\": \"\",\n          \"result\": \"* The BL Inquiry modal container is displayed with the exact window title 'BL Inquiry'\\n* The verification table schema components render underneath the query panel area\\n* Invoice Type options default automatically to FRT/MFRT\\n* The screen action element Search button remains initialized in a disabled status\"\n        },\n        {\n          \"callTestIssueId\": \"Existing_ID\"\n        },\n        {\n          \"callTestName\": \"[TW-SAP] eTax Invoice - Verify common authorization sequence\"\n        }\n      ]\n    }\n  ]\n}",
+        "options": {
+          "passthroughBinaryImages": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1648,
+        3232
+      ],
+      "id": "225069ff-119e-420e-8ecb-507d51bfdcc7",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1728,
+        3456
+      ],
+      "id": "710b182a-dd9d-4d31-9ea0-133531288f07",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\n// =====================\n// Escape GraphQL safe (Updated)\n// =====================\nfunction escapeForGraphQL(value) {\n  if (value == null) return \"\";\n  return String(value)\n    .replace(/\\\\/g, '\\\\\\\\')\n    .replace(/\"/g, '\\\\\"');\n}\n\n// =====================\n// Build GraphQL steps (Fixed to prevent double-escaping inside arrays)\n// =====================\nfunction buildSteps(steps) {\n  const formattedSteps = steps.map(step => {\n    if (step.callTestIssueId) {\n      return { callTestIssueId: String(step.callTestIssueId) };\n    }\n    if (step.callTestName) {\n      return { callTestName: String(step.callTestName) };\n    }\n    // Return raw text here. Let JSON.stringify manage the primary escapes natively.\n    return {\n      action: step.action || \"\",\n      data: step.data || \"\",\n      result: step.result || \"\"\n    };\n  });\n\n  const jsonString = JSON.stringify(formattedSteps, null, 2);\n  return jsonString.replace(/\"([^\"]+)\":/g, '$1:');\n}\n\n// =====================\n// Main\n// =====================\nconst outputs = [];\n\nfor (const item of items) {\n  let raw = item.json.output || item.json;\n  \n  // =====================\n  // Parse AI JSON safely\n  // =====================\n  if (typeof raw === \"string\") {\n    try {\n      raw = JSON.parse(\n        raw\n          .replace(/```json/g, \"\")\n          .replace(/```/g, \"\")\n          .trim()\n      );\n    } catch (err) {\n      continue;\n    }\n  }\n\n  const testCases = raw?.test_cases || [];\n\n  for (const tc of testCases) {\n\n    // =====================\n    // DUPLICATE FLOW\n    // =====================\n    // Use originalTestIssue (always a string Key like EP-XXXX) instead of numeric ID\n    if (tc.type === \"Duplicate\" && tc.originalTestIssue) {\n      outputs.push({\n        json: {\n          flowType: \"LINK_EXISTING_TEST\",\n          existingIssue: tc.originalTestIssue,\n          existingIssueId: tc.originalTestIssueId,\n          originalTicketKey: tc.jira_ticket || \"\",\n          summary: tc.summary || \"\"\n        }\n      });\n      continue;\n    }\n\n    const summary = tc.summary || tc.test_case || \"\";\n    if (!summary) continue;\n\n    // =====================\n    // Build steps\n    // =====================\n    const scenarios = tc.test_scenario || [];\n    const steps = [];\n\n    for (const s of scenarios) {\n      if (s.callTestIssueId) {\n        steps.push({\n          callTestIssueId: String(s.callTestIssueId)\n        });\n        continue;\n      }\n\n      if (s.callTestName) {\n        steps.push({\n          callTestName: String(s.callTestName)\n        });\n        continue;\n      }\n\n      steps.push({\n        action: s.action || \"\",\n        data: s.data || \"\",\n        result: s.result || \"\"\n      });\n    }\n\n    if (!steps.length) continue;\n\n    // =====================\n    // Jira project\n    // =====================\n    const jiraProject = $('Input Form').first().json.Project;\n\n    // =====================\n// Labels\n// =====================\nconst labelList = [\n  ...($('Normalize Jira Story Format').first().json.labels || [])\n];\n\nif (!labelList.includes(\"AI-gen\")) {\n  labelList.push(\"AI-gen\");\n}\n\nconst labels = `labels: [${labelList\n  .map(l => `\"${escapeForGraphQL(l)}\"`)\n  .join(\", \")}]`;\n    \n\n    // =====================\n    // Mutation (GraphQL with clean indentation formatting)\n    // =====================\n    const mutation = `\nmutation {\n  createTest(\n    testType: { name: \"Manual\" },\n    jira: {\n      fields: {\n        summary: \"${escapeForGraphQL(summary)}\",\n        project: { key: \"${escapeForGraphQL(jiraProject)}\" }\n        ${labels}\n      }\n    },\n    steps: ${buildSteps(steps)}\n  ) {\n    test {\n      issueId\n      jira(fields: [\"key\"])\n    }\n  }\n}`;\n\n    outputs.push({\n      json: {\n        query: mutation,\n        testTitle: summary,\n        originalTicketKey: tc.jira_ticket || \"\",\n        type: tc.type || \"\",\n        isCallable: tc.type === \"Callable\"\n      }\n    });\n  }\n}\n\nreturn outputs;"
+      },
+      "id": "0728f255-16a8-4a65-953e-7ebdad197b7b",
+      "name": "Convert to Xray format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        3232
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\n// =====================\n// CONFIG\n// =====================\nconst config = $('Configure').first().json;\n\n//Get Xray credentials from Configure Node\nconst CLIENT_ID = config.xray.clientId;\nconst CLIENT_SECRET = config.xray.clientSecret;\n\nconst AUTH_URL = config.xray.authUrl;\nconst GRAPHQL_URL = config.xray.graphqlUrl;\n\n//Get Jira credentials from Configure Node\nconst JIRA_BASE = config.jira.baseUrl;\nconst JIRA_EMAIL = config.jira.email;\nconst JIRA_API_TOKEN = config.jira.apiToken;\n\nconst ISSUE_LINK_URL = `${JIRA_BASE}/rest/api/3/issueLink`;\nconst JIRA_AUTH = \"Basic \" + Buffer.from(`${JIRA_EMAIL}:${JIRA_API_TOKEN}`).toString(\"base64\");\n\n// =====================\n// XRAY AUTHENTICATION\n// =====================\nconst auth = await this.helpers.httpRequest({\n  method: \"POST\",\n  url: AUTH_URL,\n  body: { client_id: CLIENT_ID, client_secret: CLIENT_SECRET },\n  json: true,\n  headers: { \"Content-Type\": \"application/json\" },\n});\nconst token = auth.replace(/\"/g, \"\").trim();\n\n// =====================\n// HELPERS\n// =====================\nfunction extractCallTestNames(query) {\n  if (!query) return [];\n  // Safer regex to match callTestName regardless of whitespaces or newlines\n  const matches = [...query.matchAll(/callTestName\\s*:\\s*\"([^\"]+)\"/g)];\n  return matches.map((m) => m[1]);\n}\n\nasync function linkToOriginalTicket(testKey, originalTicketKey) {\n  if (!testKey || !originalTicketKey) return;\n  try {\n    await this.helpers.httpRequest({\n      method: \"POST\",\n      url: ISSUE_LINK_URL,\n      headers: {\n        Authorization: JIRA_AUTH,\n        \"Content-Type\": \"application/json\",\n      },\n      body: {\n        type: { name: \"Test\" },\n        inwardIssue: { key: testKey },\n        outwardIssue: { key: originalTicketKey },\n      },\n      json: true,\n    });\n  } catch (err) {\n    console.error(`Failed to link ticket ${testKey} to ${originalTicketKey}`, err);\n  }\n}\n\n// =====================\n// STATE & PRE-PROCESSING\n// =====================\nconst callTestMap = {}; // Maps: summary/testTitle -> issueId OR jiraKey -> issueId\nconst results = [];\n\n// 1. Process LINK_EXISTING_TEST items first (FIXED: Uses JQL query since existingIssueId is a Jira Key)\nfor (const item of items) {\n  if (item.json.flowType !== \"LINK_EXISTING_TEST\") continue;\n\n  const existingKey = item.json.existingIssueId; // e.g., \"EP-19334\"\n  const originalTicketKey = item.json.originalTicketKey;\n  const itemSummary = item.json.summary || item.json.testTitle; // Supports both naming variants flexibly\n\n  try {\n    // Querying by Key via JQL to get both the exact Key and the numeric system ID\n    const res = await this.helpers.httpRequest({\n      method: \"POST\",\n      url: GRAPHQL_URL,\n      headers: { Authorization: `Bearer ${token}`, \"Content-Type\": \"application/json\" },\n      body: { \n        query: `query { getTests(jql: \"key = '${existingKey}'\", limit: 1) { results { jira(fields: [\"id\", \"key\"]) } } }` \n      },\n      json: true,\n    });\n\n    const testData = res?.data?.getTests?.results?.[0];\n    const testKey = testData?.jira?.key;\n    const testId = testData?.jira?.id;\n\n    if (testKey && testId) {\n      // Link the existing test case to the original epic/story ticket\n      await linkToOriginalTicket(testKey, originalTicketKey);\n      \n      // Map both Key and Summary so subsequent dependent tests can dynamically resolve them\n      callTestMap[testKey] = testId;\n      if (itemSummary) callTestMap[itemSummary] = testId;\n\n      results.push({\n        success: true,\n        type: \"linked_existing_test\",\n        existingIssue: testKey,\n        existingIssueId: testId,\n        originalTicketKey,\n      });\n    } else {\n      results.push({ success: false, error: `Jira Key '${existingKey}' not found via Xray JQL lookup`, item });\n    }\n  } catch (e) {\n    results.push({ success: false, error: `Failed to process link: ${e.message}`, item });\n  }\n}\n\n// 2. Pre-scan for existing dependencies in Jira via JQL\nconst allRequiredDependencies = new Set();\nfor (const item of items) {\n  if (item.json.query) {\n    extractCallTestNames(item.json.query).forEach(name => allRequiredDependencies.add(name));\n  }\n}\n\nif (allRequiredDependencies.size > 0) {\n  const names = [...allRequiredDependencies];\n  const jql = `key in (${names.map((n) => `\"${n}\"`).join(\",\")}) or summary in (${names.map((n) => `\"${n}\"`).join(\",\")})`;\n  \n  try {\n    const res = await this.helpers.httpRequest({\n      method: \"POST\",\n      url: GRAPHQL_URL,\n      headers: { Authorization: `Bearer ${token}`, \"Content-Type\": \"application/json\" },\n      body: { query: `query { getTests(jql: \"${jql}\", limit: 100, start: 0) { results { jira(fields: [\"id\", \"key\", \"summary\"]) } } }` },\n      json: true,\n    });\n\n    const tests = res?.data?.getTests?.results || [];\n    for (const t of tests) {\n      if (t?.jira?.id) {\n        if (t.jira.key) callTestMap[t.jira.key] = t.jira.id;\n        if (t.jira.summary) callTestMap[t.jira.summary] = t.jira.id;\n      }\n    }\n  } catch (e) {\n    // Suppress JQL errors\n  }\n}\n\n// ==========================================\n// DYNAMIC DEPENDENCY RESOLUTION (Queue Loop)\n// ==========================================\nlet creationQueue = items.filter(item => item.json.query && item.json.flowType !== \"LINK_EXISTING_TEST\");\nlet attemptsWithoutProgress = 0;\n\nwhile (creationQueue.length > 0) {\n  const initialQueueLength = creationQueue.length;\n  const skippedItems = [];\n\n  for (const item of creationQueue) {\n    let query = item.json.query;\n    const originalTicketKey = item.json.originalTicketKey;\n    const itemSummary = item.json.summary || item.json.testTitle; // Safeguard property mapping\n    \n    const dependencies = extractCallTestNames(query);\n\n    // Verify if all dependencies for this test case are already created/resolved\n    const allDepsResolved = dependencies.every(depName => !!callTestMap[depName]);\n\n    if (!allDepsResolved) {\n      skippedItems.push(item);\n      continue; // Push unordered items to the next queue execution iteration loop\n    }\n\n    // Replace callTestName with the corresponding callTestIssueId\n    query = query.replace(/callTestName\\s*:\\s*\"([^\"]+)\"/g, (match, name) => {\n      return `callTestIssueId: \"${callTestMap[name]}\"`;\n    });\n\n    try {\n      // Execute the test creation request on Xray\n      const res = await this.helpers.httpRequest({\n        method: \"POST\",\n        url: GRAPHQL_URL,\n        headers: { Authorization: `Bearer ${token}`, \"Content-Type\": \"application/json\" },\n        body: { query: query }, \n        json: true,\n      });\n\n      const issueId = res?.data?.createTest?.test?.issueId;\n      const key = res?.data?.createTest?.test?.jira?.key;\n\n      if (issueId) {\n        // Cache values into map for potential subsequent test dependencies\n        if (itemSummary) callTestMap[itemSummary] = issueId;\n        if (key) callTestMap[key] = issueId;\n        \n        // Link to the original ticket\n        await linkToOriginalTicket(key, originalTicketKey);\n        results.push({ success: true, key, issueId, originalTicketKey });\n      } else {\n        // Handle scenario where API returns 200 OK but encapsulates internal GraphQL error arrays\n        const graphQLErrors = res?.errors ? JSON.stringify(res.errors) : \"Unknown GraphQL Error\";\n        results.push({ success: false, error: graphQLErrors, item });\n      }\n    } catch (error) {\n      results.push({ success: false, error: error.message, item });\n    }\n  }\n\n  creationQueue = skippedItems;\n\n  // Infinite loop protection mechanism (Circular Reference Guard)\n  if (creationQueue.length === initialQueueLength) {\n    attemptsWithoutProgress++;\n    if (attemptsWithoutProgress > 1) {\n      // Map unresolvable nodes cleanly instead of throwing unhandled exceptions\n      creationQueue.forEach(i => {\n        results.push({ success: false, error: \"Unresolvable circular reference or missing dependency components\", item: i });\n      });\n      break; \n    }\n  } else {\n    attemptsWithoutProgress = 0; \n  }\n}\n\nreturn results;"
+      },
+      "id": "2d686948-21ea-464b-8fe0-968fd06e2966",
+      "name": "Import Test cases to Xray",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2224,
+        3232
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const config = $('Configure').first().json;\n\nconst auth = await this.helpers.httpRequest({\n  method: \"POST\",\n  url: config.xray.authUrl,\n  body: {\n    client_id: config.xray.clientId,\n    client_secret: config.xray.clientSecret\n  },\n  json: false,\n  headers: {\n    \"Content-Type\": \"application/json\"\n  }\n});\n\nreturn [{\n  json: {\n    token: auth.replace(/\"/g, \"\").trim()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        3232
+      ],
+      "id": "3556599c-6988-4d83-ac2e-262bfb2e129a",
+      "name": "Get Xray Token"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n{\n  json: {\n    xray: {\n      clientId: \"YOUR_XRAY_CLIENT_ID\",\n      clientSecret: \"YOUR_XRAY_CLIENT_SECRET\",\n      authUrl: \"https://xray.cloud.getxray.app/api/v2/authenticate\",\n      graphqlUrl: \"https://xray.cloud.getxray.app/api/v2/graphql\"\n    },\n    jira: {\n      baseUrl: \"https://your-company.atlassian.net\",\n      email: \"your-email@example.com\",\n      apiToken: \"YOUR_JIRA_API_TOKEN\"\n    }\n  }\n}\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        3232
+      ],
+      "id": "0205a717-934d-4bfa-86d8-45d680b5d0fc",
+      "name": "Configure"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Input Form": {
+      "main": [
+        [
+          {
+            "node": "Configure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve Jira Story Issue": {
+      "main": [
+        [
+          {
+            "node": "Clean Jira Story Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Jira Story Data": {
+      "main": [
+        [
+          {
+            "node": "Get Xray Tests",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Normalize Jira Story Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Jira Story Format": {
+      "main": [
+        [
+          {
+            "node": "Merge Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Xray Tests": {
+      "main": [
+        [
+          {
+            "node": "Merge Context",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Context": {
+      "main": [
+        [
+          {
+            "node": "Compress Existing Tests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compress Existing Tests": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Convert to Xray format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to Xray format": {
+      "main": [
+        [
+          {
+            "node": "Import Test cases to Xray",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Xray Token": {
+      "main": [
+        [
+          {
+            "node": "Retrieve Jira Story Issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configure": {
+      "main": [
+        [
+          {
+            "node": "Get Xray Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "a9ad5935-f419-4047-85e7-c5e494f8475c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c2fe6e9126866f3abf8a92526274fa9d9f3c202d6427543bb67ffde9432cd404"
+  },
+  "id": "hPNmFkyOF8xQSSjX",
+  "tags": []
+}
